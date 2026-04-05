@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout Tracker | conesalinas.ai</title>
+<meta name="description" content="Full body workout tracker with protein tracking. Built with AI.">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+
+// ─── DATA ───
+const PROGRAM = [
+  { day:"MON",label:"Squat Focus",tag:"FULL BODY",color:"#22c55e",exercises:[
+    {name:"Barbell Back Squat",sets:4,reps:"6-8",rest:"90s",type:"compound",track:1},
+    {name:"Dumbbell Bench Press",sets:3,reps:"8-10",rest:"90s",type:"compound",track:1},
+    {name:"Barbell Row",sets:3,reps:"8-10",rest:"90s",type:"compound",track:1},
+    {name:"Face Pulls",sets:2,reps:"15",rest:"60s",type:"accessory"},
+    {name:"Plank",sets:2,reps:"45 sec",rest:"45s",type:"accessory"}]},
+  { day:"TUE",label:"Hinge Focus",tag:"FULL BODY",color:"#22c55e",exercises:[
+    {name:"Romanian Deadlift",sets:4,reps:"8-10",rest:"90s",type:"compound",track:1},
+    {name:"Overhead Press",sets:3,reps:"8-10",rest:"90s",type:"compound",track:1},
+    {name:"Lat Pulldown",sets:3,reps:"10-12",rest:"60s",type:"compound",track:1},
+    {name:"Walking Lunges (DB)",sets:2,reps:"10/leg",rest:"60s",type:"accessory"},
+    {name:"Cable Crunches",sets:2,reps:"15",rest:"45s",type:"accessory"}]},
+  { day:"WED",label:"Padel or VO2 Max",tag:"CONDITIONING",color:"#f59e0b",isCardio:1,options:[
+    {name:"Option A: Padel",detail:"Play your game. This counts as your conditioning day."},
+    {name:"Option B: VO2 Max Intervals",detail:"Bike or Rower preferred. Less joint impact than running.",
+     steps:["5 min easy warm-up","4 min ALL OUT (can't talk, want to quit by min 3)","3-4 min easy recovery","Repeat x4 intervals","5 min cool-down"],totalTime:"~37 min"}]},
+  { day:"THU",label:"Press Focus",tag:"FULL BODY",color:"#22c55e",exercises:[
+    {name:"Barbell Bench Press",sets:4,reps:"6-8",rest:"90s",type:"compound",track:1},
+    {name:"Bulgarian Split Squat",sets:3,reps:"8/leg",rest:"60s",type:"compound",track:1},
+    {name:"Seated Cable Row",sets:3,reps:"10-12",rest:"60s",type:"compound",track:1},
+    {name:"Lateral Raises",sets:2,reps:"12-15",rest:"60s",type:"accessory"},
+    {name:"Hanging Leg Raises",sets:2,reps:"12",rest:"45s",type:"accessory"}]},
+  { day:"FRI",label:"Pull Focus",tag:"FULL BODY",color:"#22c55e",exercises:[
+    {name:"Trap Bar Deadlift",sets:4,reps:"5-6",rest:"2 min",type:"compound",track:1},
+    {name:"Pull-ups / Assisted",sets:3,reps:"6-10",rest:"90s",type:"compound",track:1},
+    {name:"Leg Press",sets:3,reps:"10-12",rest:"60s",type:"compound",track:1},
+    {name:"Dumbbell Curls",sets:2,reps:"12",rest:"60s",type:"accessory"},
+    {name:"Ab Wheel Rollout",sets:2,reps:"10",rest:"45s",type:"accessory"}]},
+  { day:"SAT",label:"Zone 2 Cardio",tag:"AEROBIC BASE",color:"#3b82f6",isCardio:1,options:[
+    {name:"Zone 2 Session",detail:"Conversational pace. You can talk but don't want to. HR ~130-145 bpm.",
+     steps:["Pick: bike, rower, or incline treadmill walk","30-45 min steady state at Zone 2 HR","Walking golf (no cart) also counts"],totalTime:"30-45 min"}]},
+  { day:"SUN",label:"Stability & Mobility",tag:"LONGEVITY",color:"#8b5cf6",isStability:1,blocks:[
+    {name:"Soft Tissue / Foam Roll",time:"10 min",movements:["Thoracic spine","Quads & IT band","Glutes & piriformis","Calves"]},
+    {name:"Hip Mobility Flow",time:"10 min",movements:["90/90 switches x10 each side","Hip CARs x5 each direction","Deep squat hold \u2014 60 sec cumulative","Couch stretch \u2014 45 sec each side"]},
+    {name:"Shoulder Stability",time:"8 min",movements:["Band pull-aparts x15","Turkish get-up (light KB) x3 each side","Dead hangs \u2014 30 sec x3"]},
+    {name:"Balance & Core",time:"7 min",movements:["Single leg RDL (bodyweight) x8 each","Pallof press x10 each side","Bird dogs x10 each side"]},
+    {name:"Sauna Close-out",time:"15-20 min",movements:["Relax. Breathe. Reset for the week."]}]}
+];
+
+const PROTEIN_TARGET = 165;
+const QUICK_PROTEINS = [
+  {label:"Chicken breast",grams:43},{label:"Steak",grams:42},{label:"Salmon",grams:34},
+  {label:"Eggs (3)",grams:18},{label:"Greek yogurt",grams:15},{label:"Protein shake",grams:30},
+  {label:"Ground beef",grams:36},{label:"Tuna",grams:20},{label:"Fairlife shake",grams:42},
+  {label:"Cottage cheese",grams:25},{label:"Deli turkey",grams:12},{label:"Kefir",grams:11},
+  {label:"String cheese",grams:7},{label:"Edamame",grams:17},{label:"Black beans",grams:15},
+  {label:"Cheese (1oz)",grams:7},
+];
+
+const RULES = [
+  {icon:"\u23F1",title:"Session Cap",text:"45 min lifting days. No scrolling between sets."},
+  {icon:"\u{1F4C8}",title:"Progression",text:"Hit top of rep range for all sets \u2192 add 5 lb upper / 10 lb lower next session."},
+  {icon:"\u{1F525}",title:"Warm-up",text:"5 min walk/bike + 1-2 light sets of first compound."},
+  {icon:"\u2668\uFE0F",title:"Sauna",text:"15-20 min post-workout. Recovery + cardiovascular benefit."},
+  {icon:"\u{1F6B6}",title:"Daily Steps",text:"Walking pad \u2192 10k/day. Non-negotiable. This IS your Zone 2 base."},
+  {icon:"\u{1FAC1}",title:"VO2 Max",text:"1x/week. The #1 predictor of all-cause mortality. Don't skip it."},
+  {icon:"\u{1F499}",title:"Zone 2",text:"Builds aerobic base & fat oxidation. Sat session + daily walking covers it."},
+  {icon:"\u{1F504}",title:"Program Changes",text:"Run this 8-12 weeks. Only swap a lift if you stall 2-3 weeks on it."},
+];
+
+const NUTRITION_RULES = [
+  {icon:"\u{1F6AB}",rule:"No sugar, no alcohol \u2014 keep the streak"},
+  {icon:"\u{1F373}",rule:"Weekdays: Fernanda's cooking. Don't mess with it."},
+  {icon:"\u{1F37D}",rule:"Weekends: protein-first at restaurants. Skip bread basket, skip sugary drinks."},
+  {icon:"\u{1F4AA}",rule:"Target: 165g protein/day. Track it in the Today tab."},
+  {icon:"\u2696\uFE0F",rule:"Weigh daily AM (post-bathroom, pre-food). Track weekly average."},
+  {icon:"\u{1F4C9}",rule:"Weekly avg not dropping in 2-3 weeks \u2192 we tighten up."},
+];
+
+const LONGEVITY = [
+  {pillar:"Strength",prescription:"4x/week full body",status:"\u2713",detail:"Muscle mass + bone density preservation"},
+  {pillar:"VO2 Max",prescription:"1x/week intervals",status:"\u2713",detail:"4x mortality risk reduction (top vs bottom quartile)"},
+  {pillar:"Zone 2",prescription:"3-4 hrs/week",status:"\u2713",detail:"Walking pad daily + Saturday session"},
+  {pillar:"Stability",prescription:"Sunday session",status:"\u2713",detail:"Joint health, balance, mobility for decades"},
+  {pillar:"Sauna",prescription:"Post-workout",status:"\u2713",detail:"Cardiovascular health + recovery"},
+  {pillar:"Body Comp",prescription:"191 \u2192 170-175",status:"\u2192",detail:"Reducing metabolic disease risk"},
+  {pillar:"Sleep",prescription:"7-8 hrs / 90+ score",status:"\u2713",detail:"Recovery, hormones, cognitive function"},
+];
+
+// ─── HELPERS ───
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function todayDayIdx(){return new Date().getDay()}
+function dayMap(){return [6,0,1,2,3,4,5]} // sun=0 -> idx 6
+function getAutoDay(){const jsDay=todayDayIdx();return dayMap()[jsDay]}
+function timeStr(){return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function weekNum(dateStr){const d=new Date(dateStr+"T00:00:00");const jan1=new Date(d.getFullYear(),0,1);return Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7)}
+function weekLabel(dateStr){const wn=weekNum(dateStr);const y=dateStr.substring(0,4);return `Week ${wn}, ${y}`}
+
+async function load(key,fallback){try{const r=localStorage.getItem(key);return r?JSON.parse(r):fallback}catch{return fallback}}
+async function save(key,data){try{localStorage.setItem(key,JSON.stringify(data))}catch(e){console.error("Save:",e)}}
+
+// ─── STYLES ───
+const S={
+  bg:"#0a0a0a",surface:"#141414",border:"#222",dim:"#666",dim2:"#888",text:"#e8e8e8",
+  green:"#22c55e",amber:"#f59e0b",blue:"#3b82f6",purple:"#8b5cf6",red:"#ef4444",
+  font:"'JetBrains Mono','SF Mono','Fira Code',monospace",
+};
+const card={background:S.surface,border:`1px solid ${S.border}`,borderRadius:8,padding:14,marginBottom:10};
+const inputStyle={background:S.bg,border:`1px solid ${S.border}`,borderRadius:6,color:S.text,fontSize:13,fontFamily:S.font,padding:"8px 10px",outline:"none",width:"100%",boxSizing:"border-box"};
+const btn={background:S.green,border:"none",borderRadius:6,color:"#000",fontSize:11,fontWeight:700,fontFamily:S.font,padding:"8px 16px",cursor:"pointer",letterSpacing:.5,whiteSpace:"nowrap"};
+const btnOutline={...btn,background:S.surface,color:S.text,border:`1px solid ${S.border}`};
+const removeBtn={background:"transparent",border:"none",color:"#555",cursor:"pointer",fontSize:16,padding:"2px 6px",fontFamily:S.font,lineHeight:1};
+
+function App(){
+  const [tab,setTab]=useState("today");
+  const [activeDay,setActiveDay]=useState(getAutoDay());
+  const [checked,setChecked]=useState({});
+  const [loading,setLoading]=useState(true);
+
+  const [weightLog,setWeightLog]=useState([]);
+  const [weightInput,setWeightInput]=useState("");
+  const [liftLog,setLiftLog]=useState([]);
+  const [liftInputs,setLiftInputs]=useState({});
+  const [proteinEntries,setProteinEntries]=useState([]);
+  const [proteinCustomLabel,setProteinCustomLabel]=useState("");
+  const [proteinCustomGrams,setProteinCustomGrams]=useState("");
+  const [historySection,setHistorySection]=useState("lifts");
+  const [expandedWeek,setExpandedWeek]=useState(null);
+
+  useEffect(()=>{(async()=>{
+    const [w,l,p]=await Promise.all([load("cone-w",[]),load("cone-l",[]),load("cone-p",[])]);
+    setWeightLog(w);setLiftLog(l);setProteinEntries(p);setLoading(false);
+  })()},[]);
+
+  const upW=useCallback(fn=>{setWeightLog(p=>{const n=typeof fn==="function"?fn(p):fn;save("cone-w",n);return n})},[]);
+  const upL=useCallback(fn=>{setLiftLog(p=>{const n=typeof fn==="function"?fn(p):fn;save("cone-l",n);return n})},[]);
+  const upP=useCallback(fn=>{setProteinEntries(p=>{const n=typeof fn==="function"?fn(p):fn;save("cone-p",n);return n})},[]);
+
+  const toggleCheck=(di,ei,si)=>{const k=`${di}-${ei}-${si}`;setChecked(p=>({...p,[k]:!p[k]}))};
+
+  const addWeight=()=>{const v=parseFloat(weightInput);if(!v||v<100||v>400)return;const t=todayStr();
+    upW(p=>{const f=p.filter(e=>e.date!==t);return [...f,{date:t,weight:v}].sort((a,b)=>a.date.localeCompare(b.date))});setWeightInput("")};
+
+  const logLift=(name,day)=>{const k=`${day}-${name}`;const w=parseFloat(liftInputs[k+"-w"]);const r=parseInt(liftInputs[k+"-r"]);
+    if(!w||!r)return;upL(p=>[...p,{date:todayStr(),exercise:name,weight:w,reps:r,id:Date.now()}]);
+    setLiftInputs(p=>({...p,[k+"-w"]:"",[k+"-r"]:""}))};
+
+  const deleteLift=(id)=>{upL(p=>p.filter(e=>e.id!==id))};
+
+  const getLastLift=(name)=>{const e=liftLog.filter(x=>x.exercise===name);return e.length?e[e.length-1]:null};
+
+  const getWeeklyAvg=()=>{if(!weightLog.length)return null;const l=weightLog.slice(-7);return (l.reduce((s,e)=>s+e.weight,0)/l.length).toFixed(1)};
+
+  const today=todayStr();
+  const todayProtein=proteinEntries.filter(e=>e.date===today);
+  const todayProteinTotal=todayProtein.reduce((s,e)=>s+e.grams,0);
+  const proteinPct=Math.min(100,(todayProteinTotal/PROTEIN_TARGET)*100);
+  const proteinColor=todayProteinTotal>=PROTEIN_TARGET?S.green:todayProteinTotal>=PROTEIN_TARGET*.7?S.amber:S.text;
+
+  const addProteinQuick=(item)=>{upP(p=>[...p,{date:today,label:item.label,grams:item.grams,time:timeStr(),id:Date.now()}])};
+
+  const addProteinCustom=()=>{const g=parseInt(proteinCustomGrams);if(!g||g<=0)return;
+    const label=proteinCustomLabel.trim()||"Custom";
+    upP(p=>[...p,{date:today,label,grams:g,time:timeStr(),id:Date.now()}]);
+    setProteinCustomLabel("");setProteinCustomGrams("")};
+
+  const deleteProtein=(id)=>{upP(p=>p.filter(e=>e.id!==id))};
+  const deleteWeight=(date)=>{upW(p=>p.filter(e=>e.date!==date))};
+
+  const exportCSV=()=>{
+    let csv="WEIGHT LOG\nDate,Weight (lb)\n";weightLog.forEach(e=>{csv+=`${e.date},${e.weight}\n`});
+    csv+="\nLIFT LOG\nDate,Exercise,Weight (lb),Reps\n";liftLog.forEach(e=>{csv+=`${e.date},${e.exercise},${e.weight},${e.reps}\n`});
+    csv+="\nPROTEIN LOG\nDate,Time,Food,Protein (g)\n";proteinEntries.forEach(e=>{csv+=`${e.date},${e.time||""},${e.label},${e.grams}\n`});
+    const blob=new Blob([csv],{type:"text/csv"});const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=`cone-log-${today}.csv`;a.click();URL.revokeObjectURL(url)};
+
+  const resetAll=()=>{if(!confirm("Delete ALL logged data?"))return;upW([]);upL([]);upP([])};
+
+  const currentDay=PROGRAM[activeDay];
+  const wa=getWeeklyAvg();
+
+  // History data
+  const liftsByWeek=liftLog.reduce((acc,e)=>{const wk=weekLabel(e.date);if(!acc[wk])acc[wk]=[];acc[wk].push(e);return acc},{});
+  const weightsByWeek=weightLog.reduce((acc,e)=>{const wk=weekLabel(e.date);if(!acc[wk])acc[wk]=[];acc[wk].push(e);return acc},{});
+  const proteinByDate=proteinEntries.reduce((acc,e)=>{if(!acc[e.date])acc[e.date]=0;acc[e.date]+=e.grams;return acc},{});
+
+  if(loading)return <div style={{fontFamily:S.font,background:S.bg,color:S.dim,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,letterSpacing:2}}>LOADING...</div>;
+
+  return(
+  <div style={{fontFamily:S.font,background:S.bg,color:S.text,minHeight:"100vh",maxWidth:480,margin:"0 auto",padding:"20px 16px",boxSizing:"border-box"}}>
+
+    {/* Header */}
+    <div style={{marginBottom:24}}>
+      <div style={{fontSize:10,letterSpacing:4,color:S.dim,textTransform:"uppercase",marginBottom:4}}>CONE SALINAS TREVINO</div>
+      <h1 style={{fontSize:22,fontWeight:700,margin:0,letterSpacing:-.5}}>FULL BODY 4x + LONGEVITY</h1>
+      <div style={{fontSize:11,color:S.dim,marginTop:4}}>191 → 180 by June → 170-175 by October</div>
+    </div>
+
+    {/* Progress bar */}
+    <div style={{...card,marginBottom:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:S.dim,marginBottom:8}}>
+        <span>191 lb</span><span>180 lb</span><span>170 lb</span>
+      </div>
+      <div style={{background:S.border,borderRadius:4,height:6}}>
+        <div style={{background:`linear-gradient(90deg,${S.green},#16a34a)`,borderRadius:4,height:"100%",width:`${Math.min(100,Math.max(0,((203-(wa||191))/(203-170))*100))}%`,transition:"width .5s ease"}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:S.dim,marginTop:6}}>
+        <span>Mar 2026</span><span>Jun 2026</span><span>Oct 2026</span>
+      </div>
+    </div>
+
+    {/* Summary bar */}
+    <div style={{...card,padding:"10px 14px",marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{textAlign:"center",flex:1}}>
+        <div style={{fontSize:9,color:S.dim,letterSpacing:1,textTransform:"uppercase"}}>Wk Avg</div>
+        {wa?<div style={{fontSize:16,fontWeight:700,color:S.green}}>{wa}<span style={{fontSize:10,color:S.dim}}> lb</span></div>
+            :<div style={{fontSize:12,color:"#444"}}>&mdash;</div>}
+      </div>
+      <div style={{width:1,height:30,background:S.border}}/>
+      <div style={{textAlign:"center",flex:1}}>
+        <div style={{fontSize:9,color:S.dim,letterSpacing:1,textTransform:"uppercase"}}>Protein</div>
+        <div style={{fontSize:16,fontWeight:700,color:proteinColor}}>{todayProteinTotal}<span style={{fontSize:10,color:S.dim}}>/{PROTEIN_TARGET}g</span></div>
+      </div>
+    </div>
+
+    {/* Tabs */}
+    <div style={{display:"flex",borderBottom:`1px solid ${S.border}`,marginBottom:20,overflowX:"auto"}}>
+      {["today","history","rules","nutrition","longevity"].map(t=>(
+        <button key={t} onClick={()=>setTab(t)} style={{
+          flex:t==="longevity"?"none":1,padding:t==="longevity"?"10px 6px":"10px 0",
+          background:"transparent",border:"none",color:tab===t?S.text:S.dim,
+          fontSize:10,fontWeight:tab===t?700:400,fontFamily:S.font,cursor:"pointer",
+          textTransform:"uppercase",letterSpacing:1,whiteSpace:"nowrap",
+          borderBottom:tab===t?`2px solid ${S.green}`:"2px solid transparent",transition:"all .2s"
+        }}>{t}</button>
+      ))}
+    </div>
+
+    {/* ═══ TODAY TAB ═══ */}
+    {tab==="today"&&<div>
+      {/* Day selector */}
+      <div style={{display:"flex",gap:4,marginBottom:20,flexWrap:"wrap"}}>
+        {PROGRAM.map((p,i)=>(
+          <button key={i} onClick={()=>setActiveDay(i)} style={{
+            flex:"1 1 auto",minWidth:40,background:activeDay===i?p.color:S.surface,
+            color:activeDay===i?(p.color===S.amber?"#000":p.color===S.purple?"#fff":"#000"):S.dim,
+            border:activeDay===i?"none":`1px solid ${S.border}`,borderRadius:6,padding:"10px 2px",
+            fontSize:9,fontWeight:700,fontFamily:S.font,cursor:"pointer",transition:"all .15s",letterSpacing:.5
+          }}><div>{p.day}</div></button>
+        ))}
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+        <span style={{fontSize:13,fontWeight:700}}>{currentDay.day}</span>
+        <span style={{fontSize:9,fontWeight:700,color:currentDay.color,background:`${currentDay.color}18`,padding:"3px 8px",borderRadius:4,letterSpacing:1}}>{currentDay.tag}</span>
+      </div>
+      <div style={{fontSize:11,color:currentDay.color,marginBottom:16,fontWeight:600}}>{currentDay.label}</div>
+
+      {/* Lifting exercises */}
+      {currentDay.exercises&&currentDay.exercises.map((ex,exIdx)=>{
+        const last=getLastLift(ex.name);
+        return(
+        <div key={exIdx} style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+            <div>
+              <span style={{fontSize:13,fontWeight:600}}>{ex.name}</span>
+              <span style={{fontSize:9,color:ex.type==="compound"?S.green:S.dim,marginLeft:8,textTransform:"uppercase",letterSpacing:1,fontWeight:600}}>{ex.type}</span>
+            </div>
+            <span style={{fontSize:10,color:S.dim}}>Rest {ex.rest}</span>
+          </div>
+          {last&&<div style={{fontSize:10,color:"#555",marginBottom:8}}>Last: {last.weight} lb x {last.reps} reps ({last.date})</div>}
+          <div style={{display:"flex",gap:6,marginBottom:ex.track?8:0}}>
+            {Array.from({length:ex.sets}).map((_,si)=>{
+              const done=checked[`${activeDay}-${exIdx}-${si}`];
+              return(<button key={si} onClick={()=>toggleCheck(activeDay,exIdx,si)} style={{
+                flex:1,background:done?`${currentDay.color}20`:S.bg,
+                border:done?`1px solid ${currentDay.color}`:`1px solid ${S.border}`,
+                borderRadius:6,padding:"8px 4px",cursor:"pointer",transition:"all .15s",fontFamily:S.font
+              }}>
+                <div style={{fontSize:9,color:S.dim,marginBottom:2}}>SET {si+1}</div>
+                <div style={{fontSize:12,fontWeight:700,color:done?currentDay.color:S.text}}>{ex.reps}</div>
+              </button>)
+            })}
+          </div>
+          {ex.track&&<div style={{display:"flex",gap:6,marginTop:8}}>
+            <input type="number" placeholder="lb" value={liftInputs[`${currentDay.day}-${ex.name}-w`]||""} onChange={e=>setLiftInputs(p=>({...p,[`${currentDay.day}-${ex.name}-w`]:e.target.value}))} style={{...inputStyle,flex:1}}/>
+            <input type="number" placeholder="reps" value={liftInputs[`${currentDay.day}-${ex.name}-r`]||""} onChange={e=>setLiftInputs(p=>({...p,[`${currentDay.day}-${ex.name}-r`]:e.target.value}))} style={{...inputStyle,flex:1}}/>
+            <button onClick={()=>logLift(ex.name,currentDay.day)} style={btn}>LOG</button>
+          </div>}
+        </div>)
+      })}
+
+      {/* Cardio days */}
+      {currentDay.isCardio&&currentDay.options&&currentDay.options.map((opt,i)=>(
+        <div key={i} style={{...card,padding:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:currentDay.color,marginBottom:6}}>{opt.name}</div>
+          <div style={{fontSize:11,color:S.dim2,marginBottom:opt.steps?12:0,lineHeight:1.5}}>{opt.detail}</div>
+          {opt.steps&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {opt.steps.map((step,j)=>(
+              <div key={j} style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                <span style={{fontSize:10,fontWeight:700,color:currentDay.color,minWidth:20,textAlign:"right"}}>{j+1}</span>
+                <span style={{fontSize:12,color:S.text,lineHeight:1.5}}>{step}</span>
+              </div>))}
+          </div>}
+          {opt.totalTime&&<div style={{marginTop:12,fontSize:10,color:S.dim,letterSpacing:1,textTransform:"uppercase"}}>Total: {opt.totalTime}</div>}
+        </div>
+      ))}
+
+      {/* Stability day */}
+      {currentDay.isStability&&currentDay.blocks&&currentDay.blocks.map((block,i)=>(
+        <div key={i} style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{fontSize:13,fontWeight:700}}>{block.name}</span>
+            <span style={{fontSize:10,color:currentDay.color,fontWeight:600}}>{block.time}</span>
+          </div>
+          {block.movements.map((m,j)=>(
+            <div key={j} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderTop:j>0?"1px solid #1a1a1a":"none"}}>
+              <span style={{fontSize:10,color:"#555",minWidth:16}}>{j+1}</span>
+              <span style={{fontSize:12,color:"#ccc",lineHeight:1.4}}>{m}</span>
+            </div>))}
+        </div>
+      ))}
+
+      {/* ── Protein tracker ── */}
+      <div style={{marginTop:20,marginBottom:4,fontSize:10,letterSpacing:2,color:S.dim,textTransform:"uppercase"}}>NUTRITION TRACKING</div>
+      <div style={{...card,padding:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:700}}>TODAY'S PROTEIN</div>
+          <div style={{fontSize:14,fontWeight:700,color:proteinColor}}>
+            {todayProteinTotal}g <span style={{fontSize:10,fontWeight:400,color:S.dim}}>/ {PROTEIN_TARGET}g</span>
+          </div>
+        </div>
+        <div style={{background:S.border,borderRadius:4,height:8,marginBottom:14}}>
+          <div style={{height:"100%",borderRadius:4,transition:"width .3s",width:`${proteinPct}%`,
+            background:todayProteinTotal>=PROTEIN_TARGET?`linear-gradient(90deg,${S.green},#16a34a)`:todayProteinTotal>=PROTEIN_TARGET*.7?`linear-gradient(90deg,${S.amber},#d97706)`:`linear-gradient(90deg,${S.red},#dc2626)`
+          }}/>
+        </div>
+        <div style={{fontSize:10,color:S.dim,marginBottom:8,letterSpacing:1,textTransform:"uppercase"}}>Quick add</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+          {QUICK_PROTEINS.map((item,i)=>(
+            <button key={i} onClick={()=>addProteinQuick(item)} style={{background:S.bg,border:`1px solid ${S.border}`,borderRadius:6,padding:"6px 10px",cursor:"pointer",fontFamily:S.font,transition:"all .15s"}}>
+              <span style={{fontSize:11,color:S.text}}>{item.label}</span>
+              <span style={{fontSize:9,color:S.green,marginLeft:6,fontWeight:700}}>+{item.grams}g</span>
+            </button>
+          ))}
+        </div>
+        <div style={{fontSize:10,color:S.dim,marginBottom:8,letterSpacing:1,textTransform:"uppercase"}}>Custom entry</div>
+        <div style={{display:"flex",gap:6}}>
+          <input type="text" placeholder="Food" value={proteinCustomLabel} onChange={e=>setProteinCustomLabel(e.target.value)} style={{...inputStyle,flex:2}}/>
+          <input type="number" placeholder="g" value={proteinCustomGrams} onChange={e=>setProteinCustomGrams(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addProteinCustom()} style={{...inputStyle,flex:1}}/>
+          <button onClick={addProteinCustom} style={btn}>ADD</button>
+        </div>
+      </div>
+
+      {todayProtein.length>0&&<div style={{...card,padding:16}}>
+        {todayProtein.map((e,i)=>(
+          <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderTop:i>0?"1px solid #1a1a1a":"none"}}>
+            <div>
+              <span style={{fontSize:11,fontWeight:600}}>{e.label}</span>
+              <span style={{fontSize:9,color:"#555",marginLeft:8}}>{e.time}</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:12,fontWeight:700,color:S.green}}>+{e.grams}g</span>
+              <button onClick={()=>deleteProtein(e.id)} style={removeBtn}>&times;</button>
+            </div>
+          </div>
+        ))}
+      </div>}
+
+      {/* ── Weight input ── */}
+      <div style={{...card,padding:16}}>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:10}}>LOG MORNING WEIGHT</div>
+        <div style={{display:"flex",gap:8}}>
+          <input type="number" placeholder="e.g. 190.5" value={weightInput} onChange={e=>setWeightInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addWeight()} style={{...inputStyle,flex:1}}/>
+          <button onClick={addWeight} style={btn}>LOG</button>
+        </div>
+        <div style={{fontSize:9,color:"#555",marginTop:6}}>Post-bathroom, pre-food. Same time every day.</div>
+      </div>
+    </div>}
+
+    {/* ═══ HISTORY TAB ═══ */}
+    {tab==="history"&&<div>
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:20}}>
+        {[["lifts","Lifts"],["weight","Weight"],["protein","Protein"]].map(([k,label])=>(
+          <button key={k} onClick={()=>setHistorySection(k)} style={{
+            flex:1,background:historySection===k?S.green:S.surface,
+            color:historySection===k?"#000":S.dim,
+            border:historySection===k?"none":`1px solid ${S.border}`,
+            borderRadius:6,padding:"10px 4px",fontSize:10,fontWeight:700,
+            fontFamily:S.font,cursor:"pointer",letterSpacing:.5
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Lifts history */}
+      {historySection==="lifts"&&<div>
+        {Object.keys(liftsByWeek).length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#444",fontSize:12}}>No lifts logged yet.</div>}
+        {Object.keys(liftsByWeek).reverse().map(wk=>{
+          const entries=liftsByWeek[wk];
+          const isOpen=expandedWeek===wk;
+          const byExercise=entries.reduce((a,e)=>{if(!a[e.exercise])a[e.exercise]=[];a[e.exercise].push(e);return a},{});
+          return(
+          <div key={wk} style={card}>
+            <button onClick={()=>setExpandedWeek(isOpen?null:wk)} style={{background:"transparent",border:"none",width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontFamily:S.font,padding:0}}>
+              <span style={{fontSize:12,fontWeight:700,color:S.text}}>{wk}</span>
+              <span style={{fontSize:11,color:S.dim}}>{isOpen?"\u25B2":"\u25BC"} {entries.length} entries</span>
+            </button>
+            {isOpen&&<div style={{marginTop:12}}>
+              {Object.entries(byExercise).map(([name,lifts])=>(
+                <div key={name} style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:700,color:S.green,marginBottom:6}}>{name}</div>
+                  {lifts.map(l=>(
+                    <div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderTop:"1px solid #1a1a1a"}}>
+                      <span style={{fontSize:10,color:S.dim2}}>{l.date}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,fontWeight:700}}>{l.weight} lb x {l.reps}</span>
+                        <button onClick={()=>deleteLift(l.id)} style={removeBtn}>&times;</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>}
+          </div>)
+        })}
+      </div>}
+
+      {/* Weight history */}
+      {historySection==="weight"&&<div>
+        {Object.keys(weightsByWeek).length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#444",fontSize:12}}>No weight data yet.</div>}
+        {Object.keys(weightsByWeek).reverse().map(wk=>{
+          const entries=weightsByWeek[wk];
+          const avg=(entries.reduce((s,e)=>s+e.weight,0)/entries.length).toFixed(1);
+          return(
+          <div key={wk} style={card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <span style={{fontSize:12,fontWeight:700}}>{wk}</span>
+              <span style={{fontSize:14,fontWeight:700,color:S.green}}>{avg} <span style={{fontSize:10,fontWeight:400,color:S.dim}}>lb avg</span></span>
+            </div>
+            {entries.map((e,i)=>(
+              <div key={e.date} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderTop:i>0?"1px solid #1a1a1a":"none"}}>
+                <span style={{fontSize:10,color:S.dim2}}>{e.date}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:11,fontWeight:600}}>{e.weight} lb</span>
+                  <button onClick={()=>deleteWeight(e.date)} style={removeBtn}>&times;</button>
+                </div>
+              </div>
+            ))}
+          </div>)
+        })}
+      </div>}
+
+      {/* Protein history */}
+      {historySection==="protein"&&<div>
+        {Object.keys(proteinByDate).length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#444",fontSize:12}}>No protein data yet.</div>}
+        {Object.keys(proteinByDate).sort().reverse().slice(0,30).map(date=>{
+          const total=proteinByDate[date];
+          const hit=total>=PROTEIN_TARGET;
+          const close=total>=PROTEIN_TARGET*.7;
+          return(
+          <div key={date} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",...card}}>
+            <span style={{fontSize:11,color:S.dim2}}>{date}</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:13,fontWeight:700,color:hit?S.green:close?S.amber:S.red}}>{total}g</span>
+              <span style={{fontSize:9,color:hit?S.green:close?S.amber:S.red}}>{hit?"\u2713":close?"~":"\u2717"}</span>
+            </div>
+          </div>)
+        })}
+      </div>}
+
+      {/* Export / Reset */}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        <button onClick={exportCSV} style={{...btnOutline,flex:1}}>EXPORT CSV</button>
+        <button onClick={resetAll} style={{...btnOutline,flex:1,color:S.red,borderColor:"#331111"}}>RESET ALL</button>
+      </div>
+    </div>}
+
+    {/* ═══ RULES TAB ═══ */}
+    {tab==="rules"&&<div>
+      {RULES.map((r,i)=>(
+        <div key={i} style={{...card,display:"flex",gap:12,alignItems:"flex-start"}}>
+          <span style={{fontSize:20}}>{r.icon}</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:4}}>{r.title}</div>
+            <div style={{fontSize:11,color:S.dim2,lineHeight:1.5}}>{r.text}</div>
+          </div>
+        </div>
+      ))}
+    </div>}
+
+    {/* ═══ NUTRITION TAB ═══ */}
+    {tab==="nutrition"&&<div>
+      {NUTRITION_RULES.map((n,i)=>(
+        <div key={i} style={{...card,display:"flex",gap:12,alignItems:"center"}}>
+          <span style={{fontSize:20}}>{n.icon}</span>
+          <div style={{fontSize:12,color:"#ccc",lineHeight:1.5}}>{n.rule}</div>
+        </div>
+      ))}
+    </div>}
+
+    {/* ═══ LONGEVITY TAB ═══ */}
+    {tab==="longevity"&&<div>
+      <div style={{fontSize:11,color:S.dim2,marginBottom:16,lineHeight:1.6}}>Attia's Outlive framework. All pillars covered.</div>
+      {LONGEVITY.map((l,i)=>(
+        <div key={i} style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:13,fontWeight:700}}>{l.pillar}</span>
+            <span style={{fontSize:11,color:l.status==="\u2713"?S.green:S.amber,fontWeight:700}}>{l.status}</span>
+          </div>
+          <div style={{fontSize:11,color:S.green,marginBottom:4,fontWeight:600}}>{l.prescription}</div>
+          <div style={{fontSize:10,color:S.dim,lineHeight:1.5}}>{l.detail}</div>
+        </div>
+      ))}
+    </div>}
+
+    {/* Footer */}
+    <div style={{marginTop:30,paddingTop:16,borderTop:`1px solid ${S.border}`,fontSize:10,color:"#444",textAlign:"center",letterSpacing:1}}>
+      BUILT FOR CONE &middot; APRIL 2026 &middot; NO EXCUSES
+    </div>
+  </div>)
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
