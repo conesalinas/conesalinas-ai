@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf Skins Calculator | conesalinas.ai</title>
+<meta name="description" content="Calculate golf skins payouts instantly. Built with AI.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#07080a;color:#ddd9d0;font-family:'Courier New',monospace;min-height:100vh;padding:20px 16px}
+.container{max-width:520px;margin:0 auto}
+.header{font-size:13px;letter-spacing:4px;color:#5da9d6;text-transform:uppercase;text-align:center;margin-bottom:24px}
+h2{font-size:18px;font-weight:700;margin-bottom:16px;letter-spacing:0.5px}
+.card{background:#111216;border:1px solid #1a1a1a;border-radius:10px;padding:16px;margin-bottom:12px}
+input[type="text"],input[type="number"]{background:#07080a;border:1px solid #222;border-radius:8px;color:#ddd9d0;font-size:14px;font-family:'Courier New',monospace;padding:10px 12px;outline:none;width:100%;box-sizing:border-box}
+input:focus{border-color:#5da9d6}
+input[type="number"]{-moz-appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.btn{border:none;border-radius:8px;padding:12px 24px;font-size:13px;font-weight:700;font-family:'Courier New',monospace;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.25s}
+.btn-primary{background:#5da9d6;color:#07080a}
+.btn-primary:hover{background:#7bbde3}
+.btn-outline{background:transparent;color:#666;border:1px solid #222}
+.btn-outline:hover{border-color:#5da9d6;color:#5da9d6}
+.btn-green{background:#22c55e;color:#07080a}
+.btn-green:hover{background:#16a34a}
+.label{font-size:10px;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:6px}
+.player-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.player-remove{background:transparent;border:none;color:#333;font-size:18px;cursor:pointer;padding:4px 8px;transition:color 0.2s}
+.player-remove:hover{color:#c0392b}
+.player-num{font-size:12px;color:#444;min-width:24px}
+.hole-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.hole-num{font-size:24px;font-weight:700}
+.score-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #151517}
+.score-row:first-child{border-top:none}
+.score-name{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score-input{width:56px!important;text-align:center;padding:8px;flex-shrink:0}
+.score-btn{width:34px;height:34px;border-radius:6px;border:1px solid #222;background:#111216;color:#ddd9d0;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.score-btn:hover{border-color:#5da9d6;color:#5da9d6}
+.hole-summary{display:flex;flex-wrap:wrap;gap:4px;margin-top:16px}
+.hole-dot{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1px solid #222;background:#0d0e10;color:#444;cursor:pointer;transition:all 0.2s}
+.hole-dot.current{border-color:#5da9d6;color:#5da9d6}
+.hole-dot.filled{background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.2);color:#22c55e}
+.hole-dot.won{background:rgba(93,169,214,0.15);border-color:#5da9d6;color:#5da9d6}
+.positive{color:#22c55e}
+.negative{color:#ef4444}
+.even{color:#666}
+.scorecard{width:100%;border-collapse:collapse;font-size:11px}
+.scorecard th,.scorecard td{padding:6px 4px;text-align:center;border:1px solid #1a1a1a}
+.scorecard th{background:#0d0e10;color:#666;font-weight:600;font-size:9px;letter-spacing:1px}
+.scorecard td{color:#999}
+.scorecard .player-col{text-align:left;font-weight:600;color:#ddd9d0;min-width:60px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scorecard .winner-cell{color:#22c55e;font-weight:700}
+.scorecard .total-col{font-weight:700;color:#ddd9d0;background:#0d0e10}
+.settlement-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #151517}
+.settlement-row:first-child{border-top:none}
+.settlement-arrow{color:#5da9d6;font-size:14px;margin:0 8px}
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+footer{text-align:center;font-size:10px;color:#222;letter-spacing:2px;margin-top:32px;padding-top:16px;border-top:1px solid #111}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">CONESALINAS.AI</div>
+<div id="app"></div>
+<footer>BUILT WITH AI · CONESALINAS.AI</footer>
+</div>
+
+<script>
+let state = {
+  screen: 'setup',
+  players: [{name:''},{name:''}],
+  betPerPlayer: '',
+  scores: {},
+  currentHole: 1,
+};
+
+function render() {
+  const app = document.getElementById('app');
+  if (state.screen === 'setup') renderSetup(app);
+  else if (state.screen === 'scoring') renderScoring(app);
+  else if (state.screen === 'results') renderResults(app);
+}
+
+function renderSetup(app) {
+  let html = '<h2>\u26F3 Golf Skins</h2>';
+  html += '<div class="card"><div class="label">Players</div><div id="playerList"></div>';
+  html += '<button class="btn btn-outline" style="width:100%;margin-top:8px" id="addPlayerBtn">+ Add Player</button></div>';
+  html += '<div class="card"><div class="label">Total bet per player (for all 18 holes)</div>';
+  html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px;color:#666">$</span>';
+  html += '<input type="number" placeholder="e.g. 18" id="betInput"></div>';
+  html += '<div id="potDisplay" style="margin-top:10px;font-size:11px;color:#555"></div></div>';
+  html += '<button class="btn btn-primary" style="width:100%;margin-top:8px" id="startGameBtn">START GAME</button>';
+  app.innerHTML = html;
+
+  renderPlayerList();
+  const betInput = document.getElementById('betInput');
+  betInput.value = state.betPerPlayer;
+  betInput.addEventListener('input', e => {
+    state.betPerPlayer = e.target.value;
+    updatePotDisplay();
+  });
+  updatePotDisplay();
+
+  document.getElementById('addPlayerBtn').addEventListener('click', () => {
+    state.players.push({name:''});
+    renderPlayerList();
+    updatePotDisplay();
+  });
+
+  document.getElementById('startGameBtn').addEventListener('click', () => {
+    const bet = parseFloat(state.betPerPlayer);
+    if (!bet || bet <= 0) { alert('Enter a bet amount'); return; }
+    if (state.players.some(p => !p.name.trim())) { alert('Enter all player names'); return; }
+    state.screen = 'scoring';
+    state.currentHole = 1;
+    render();
+  });
+}
+
+function renderPlayerList() {
+  const list = document.getElementById('playerList');
+  list.innerHTML = state.players.map((p, i) => `
+    <div class="player-row">
+      <span class="player-num">${i+1}.</span>
+      <input type="text" placeholder="Player ${i+1} name" value="${esc(p.name)}" id="pname-${i}">
+      ${state.players.length > 2 ? `<button class="player-remove" id="premove-${i}">&times;</button>` : ''}
+    </div>
+  `).join('');
+
+  state.players.forEach((p, i) => {
+    document.getElementById('pname-'+i).addEventListener('input', e => {
+      state.players[i].name = e.target.value;
+    });
+    const rmBtn = document.getElementById('premove-'+i);
+    if (rmBtn) rmBtn.addEventListener('click', () => {
+      state.players.splice(i, 1);
+      renderPlayerList();
+      updatePotDisplay();
+    });
+  });
+}
+
+function updatePotDisplay() {
+  const el = document.getElementById('potDisplay');
+  const bet = parseFloat(state.betPerPlayer) || 0;
+  if (bet > 0) {
+    const pot = state.players.length * bet;
+    el.innerHTML = `${state.players.length} players \u00D7 $${bet.toFixed(2)} = <span style="color:#5da9d6;font-weight:700">$${pot.toFixed(2)} pot</span><br>Each hole: $${(pot/18).toFixed(2)}`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function renderScoring(app) {
+  const hole = state.currentHole;
+  const bet = parseFloat(state.betPerPlayer) || 0;
+  const perHole = (state.players.length * bet) / 18;
+  const carry = getCarryover(hole);
+  const holeValue = perHole * carry;
+
+  const rows = state.players.map((p, i) => {
+    const key = `${hole}-${i}`;
+    const val = state.scores[key] !== undefined ? state.scores[key] : '';
+    return `
+      <div class="score-row">
+        <span class="score-name">${esc(p.name) || 'Player '+(i+1)}</span>
+        <button class="score-btn" id="sdec-${i}">\u2212</button>
+        <input type="number" class="score-input" value="${val}" placeholder="\u2014" id="sinput-${i}" min="1" max="15">
+        <button class="score-btn" id="sinc-${i}">+</button>
+      </div>
+    `;
+  }).join('');
+
+  const dots = Array.from({length:18}, (_,i) => {
+    const h = i+1;
+    const filled = isHoleFilled(h);
+    const isCurrent = h === hole;
+    const winner = getHoleWinner(h);
+    let cls = 'hole-dot';
+    if (isCurrent) cls += ' current';
+    else if (winner !== null) cls += ' won';
+    else if (filled) cls += ' filled';
+    return `<div class="${cls}" id="hdot-${h}">${h}</div>`;
+  }).join('');
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <button class="btn btn-outline" id="backSetupBtn" style="padding:8px 16px;font-size:11px">\u2190 Setup</button>
+      <div style="text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#5da9d6">$${holeValue.toFixed(2)}</div>
+        <div style="font-size:10px;color:#555">${carry > 1 ? carry + ' holes carried' : 'this hole'}</div>
+      </div>
+      <div style="width:70px"></div>
+    </div>
+    <div class="hole-nav">
+      <button class="btn btn-outline" id="prevHoleBtn" style="padding:8px 14px${hole===1?';opacity:0.3':''}">\u25C0</button>
+      <div style="text-align:center">
+        <div class="hole-num">Hole ${hole}</div>
+        <span style="font-size:10px;padding:3px 10px;border-radius:4px;letter-spacing:1px;color:${carry>1?'#f59e0b':'#22c55e'};background:${carry>1?'rgba(245,158,11,0.1)':'rgba(34,197,94,0.1)'};border:1px solid ${carry>1?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}">${carry > 1 ? carry + ' SKINS' : '1 SKIN'}</span>
+      </div>
+      <button class="btn btn-outline" id="nextHoleBtn" style="padding:8px 14px${hole===18?';opacity:0.3':''}">\u25B6</button>
+    </div>
+    <div class="card">${rows}</div>
+    <div class="hole-summary">${dots}</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-outline" style="flex:1" id="clearHoleBtn">Clear Hole</button>
+      <button class="btn btn-green" style="flex:1" id="seeResultsBtn">See Results</button>
+    </div>`;
+
+  app.innerHTML = html;
+
+  // Bind score inputs
+  state.players.forEach((_, i) => {
+    const key = `${hole}-${i}`;
+    document.getElementById('sinput-'+i).addEventListener('input', e => {
+      const val = e.target.value;
+      if (val === '') state.scores[key] = '';
+      else { const n = parseInt(val); if (n >= 1 && n <= 15) state.scores[key] = n; }
+    });
+    document.getElementById('sinc-'+i).addEventListener('click', () => {
+      const cur = state.scores[key];
+      if (cur === undefined || cur === '') state.scores[key] = 4;
+      else if (cur < 15) state.scores[key] = cur + 1;
+      render();
+    });
+    document.getElementById('sdec-'+i).addEventListener('click', () => {
+      const cur = state.scores[key];
+      if (cur !== undefined && cur !== '' && cur > 1) state.scores[key] = cur - 1;
+      render();
+    });
+  });
+
+  // Hole dots
+  for (let h = 1; h <= 18; h++) {
+    document.getElementById('hdot-'+h).addEventListener('click', () => { state.currentHole = h; render(); });
+  }
+
+  document.getElementById('prevHoleBtn').addEventListener('click', () => { if (state.currentHole > 1) { state.currentHole--; render(); } });
+  document.getElementById('nextHoleBtn').addEventListener('click', () => { if (state.currentHole < 18) { state.currentHole++; render(); } });
+  document.getElementById('clearHoleBtn').addEventListener('click', () => {
+    state.players.forEach((_, i) => { delete state.scores[`${hole}-${i}`]; });
+    render();
+  });
+  document.getElementById('seeResultsBtn').addEventListener('click', () => { state.screen = 'results'; render(); });
+  document.getElementById('backSetupBtn').addEventListener('click', () => { state.screen = 'setup'; render(); });
+}
+
+function renderResults(app) {
+  const bet = parseFloat(state.betPerPlayer) || 0;
+  const numPlayers = state.players.length;
+  const pot = numPlayers * bet;
+  const perHole = pot / 18;
+  const results = calculateResults();
+
+  // Each player gets their share of unclaimed money back
+  const refundPerPlayer = results.unclaimed / numPlayers;
+  const effectiveBet = bet - refundPerPlayer;
+
+  // Scorecard
+  let holeHeaders = '';
+  for (let h = 1; h <= 18; h++) holeHeaders += `<th>${h}</th>`;
+
+  let scorecardRows = state.players.map((p, pi) => {
+    let totalScore = 0;
+    let cells = '';
+    for (let h = 1; h <= 18; h++) {
+      const val = state.scores[`${h}-${pi}`];
+      const winner = getHoleWinner(h);
+      const isWinner = winner === pi;
+      if (val !== undefined && val !== '') totalScore += parseInt(val);
+      cells += `<td class="${isWinner ? 'winner-cell' : ''}">${val !== undefined && val !== '' ? val : '\u2014'}</td>`;
+    }
+    return `<tr><td class="player-col">${esc(p.name) || 'P'+(pi+1)}</td>${cells}<td class="total-col">${totalScore || '\u2014'}</td></tr>`;
+  }).join('');
+
+  // Skins row
+  let skinsRow = '<tr><td class="player-col" style="color:#5da9d6;font-size:9px">SKINS</td>';
+  for (let h = 1; h <= 18; h++) {
+    const winner = getHoleWinner(h);
+    const carry = getCarryover(h);
+    if (winner !== null) skinsRow += `<td style="color:#22c55e;font-weight:700;font-size:9px">${carry}</td>`;
+    else if (isHoleFilled(h)) skinsRow += `<td style="color:#f59e0b;font-size:9px">\u2192</td>`;
+    else skinsRow += `<td>\u2014</td>`;
+  }
+  skinsRow += '<td class="total-col"></td></tr>';
+
+  // Payout rows with correct net (accounting for unclaimed refund)
+  const payoutRows = results.playerResults.map(r => {
+    const net = r.won - effectiveBet;
+    const netClass = net > 0.005 ? 'positive' : net < -0.005 ? 'negative' : 'even';
+    const netStr = net > 0.005 ? `+$${net.toFixed(2)}` : net < -0.005 ? `-$${Math.abs(net).toFixed(2)}` : '$0.00';
+    const action = net > 0.005 ? 'COLLECTS' : net < -0.005 ? 'OWES' : 'EVEN';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #151517">
+        <div>
+          <div style="font-size:14px;font-weight:600">${esc(r.name)}</div>
+          <div style="font-size:10px;color:#666">${r.skinsCount} skin${r.skinsCount!==1?'s':''} won${r.holesWon.length ? ' (H' + r.holesWon.join(', H') + ')' : ''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700" class="${netClass}">${netStr}</div>
+          <div style="font-size:10px;color:#555">${action}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Settlement: who pays who (using corrected nets)
+  const correctedResults = results.playerResults.map(r => ({
+    name: r.name,
+    net: r.won - effectiveBet
+  }));
+
+  const debtors = correctedResults.filter(r => r.net < -0.005).map(r => ({name: r.name, amount: Math.abs(r.net)}));
+  const creditors = correctedResults.filter(r => r.net > 0.005).map(r => ({name: r.name, amount: r.net}));
+
+  let settlements = [];
+  let di = 0, ci = 0;
+  let dRemain = debtors.length ? debtors[0].amount : 0;
+  let cRemain = creditors.length ? creditors[0].amount : 0;
+
+  while (di < debtors.length && ci < creditors.length) {
+    const amount = Math.min(dRemain, cRemain);
+    if (amount > 0.005) {
+      settlements.push({ from: debtors[di].name, to: creditors[ci].name, amount: Math.round(amount * 100) / 100 });
+    }
+    dRemain -= amount;
+    cRemain -= amount;
+    if (dRemain < 0.005) { di++; dRemain = di < debtors.length ? debtors[di].amount : 0; }
+    if (cRemain < 0.005) { ci++; cRemain = ci < creditors.length ? creditors[ci].amount : 0; }
+  }
+
+  const settlementHTML = settlements.length > 0 ? settlements.map(s => `
+    <div class="settlement-row">
+      <span style="font-size:13px;font-weight:600" class="negative">${esc(s.from)}</span>
+      <span class="settlement-arrow">\u2192 $${s.amount.toFixed(2)} \u2192</span>
+      <span style="font-size:13px;font-weight:600" class="positive">${esc(s.to)}</span>
+    </div>
+  `).join('') : '<div style="text-align:center;padding:16px;color:#666;font-size:12px">Everyone broke even!</div>';
+
+  let html = `
+    <h2>\uD83C\uDFC6 Results</h2>
+
+    <div class="card" style="display:flex;justify-content:space-around;text-align:center">
+      <div>
+        <div class="label">Pot</div>
+        <div style="font-size:18px;font-weight:700;color:#5da9d6">$${pot.toFixed(2)}</div>
+      </div>
+      <div>
+        <div class="label">Paid Out</div>
+        <div style="font-size:18px;font-weight:700;color:#22c55e">$${results.totalPaidOut.toFixed(2)}</div>
+      </div>
+      ${results.unclaimed > 0.005 ? `<div>
+        <div class="label">Returned</div>
+        <div style="font-size:18px;font-weight:700;color:#f59e0b">$${results.unclaimed.toFixed(2)}</div>
+        <div style="font-size:9px;color:#555">$${refundPerPlayer.toFixed(2)}/player</div>
+      </div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px">\uD83D\uDCB0 Settlement \u2014 Who Pays Who</div>
+      ${settlementHTML}
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:4px">Player Breakdown</div>
+      ${payoutRows}
+      ${results.unclaimed > 0.005 ? `<div style="font-size:10px;color:#555;margin-top:8px;padding-top:8px;border-top:1px solid #151517">Effective bet: $${effectiveBet.toFixed(2)}/player ($${bet.toFixed(2)} minus $${refundPerPlayer.toFixed(2)} returned from unclaimed holes)</div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px">\uD83D\uDCCB Scorecard</div>
+      <div class="scroll-x">
+        <table class="scorecard">
+          <thead><tr><th></th>${holeHeaders}<th>TOT</th></tr></thead>
+          <tbody>${scorecardRows}${skinsRow}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px">Hole by Hole</div>
+      ${results.holeBreakdown.map(h => {
+        const winnerName = h.winner !== null ? esc(state.players[h.winner].name || 'Player '+(h.winner+1)) : null;
+        return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #151517;font-size:11px">
+          <span style="color:#555">Hole ${h.hole}</span>
+          <span style="color:${h.winner !== null ? '#22c55e' : h.carried ? '#f59e0b' : '#333'}">
+            ${h.winner !== null ? winnerName + ' wins $' + h.value.toFixed(2) + ' (' + h.skinsCount + ' skin' + (h.skinsCount!==1?'s':'') + ')' : h.carried ? 'Tie \u2192 carries over' : '\u2014'}
+          </span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-outline" style="flex:1" id="backScoringBtn">\u2190 Edit Scores</button>
+      <button class="btn btn-primary" style="flex:1" id="newGameBtn">New Game</button>
+    </div>`;
+
+  app.innerHTML = html;
+
+  document.getElementById('backScoringBtn').addEventListener('click', () => { state.screen = 'scoring'; render(); });
+  document.getElementById('newGameBtn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    if (btn.dataset.confirmed === 'true') {
+      state = { screen: 'setup', players: [{name:''},{name:''}], betPerPlayer: '', scores: {}, currentHole: 1 };
+      render();
+    } else {
+      btn.dataset.confirmed = 'true';
+      btn.textContent = 'TAP AGAIN TO CONFIRM';
+      btn.style.background = '#ef4444';
+      setTimeout(() => { btn.dataset.confirmed = 'false'; btn.textContent = 'NEW GAME'; btn.style.background = '#5da9d6'; }, 3000);
+    }
+  });
+}
+
+// ── GAME LOGIC ──
+function getHoleWinner(hole) {
+  const scores = state.players.map((_, i) => {
+    const val = state.scores[`${hole}-${i}`];
+    return val !== undefined && val !== '' ? parseInt(val) : null;
+  });
+  if (scores.some(s => s === null)) return null;
+  const min = Math.min(...scores);
+  const winners = scores.reduce((acc, s, i) => s === min ? [...acc, i] : acc, []);
+  return winners.length === 1 ? winners[0] : null;
+}
+
+function isHoleFilled(hole) {
+  return state.players.every((_, i) => {
+    const val = state.scores[`${hole}-${i}`];
+    return val !== undefined && val !== '';
+  });
+}
+
+function getCarryover(hole) {
+  let carry = 1;
+  for (let h = hole - 1; h >= 1; h--) {
+    if (isHoleFilled(h) && getHoleWinner(h) === null) carry++;
+    else break;
+  }
+  return carry;
+}
+
+function calculateResults() {
+  const bet = parseFloat(state.betPerPlayer) || 0;
+  const pot = state.players.length * bet;
+  const perHole = pot / 18;
+  const playerWon = state.players.map(() => 0);
+  const playerSkinsCount = state.players.map(() => 0);
+  const playerHoles = state.players.map(() => []);
+  const holeBreakdown = [];
+  let accumulated = 0;
+  let totalPaidOut = 0;
+
+  for (let h = 1; h <= 18; h++) {
+    accumulated += perHole;
+    const winner = getHoleWinner(h);
+    const filled = isHoleFilled(h);
+
+    if (winner !== null) {
+      const skinsCount = Math.round(accumulated / perHole);
+      playerWon[winner] += accumulated;
+      playerSkinsCount[winner] += skinsCount;
+      playerHoles[winner].push(h);
+      holeBreakdown.push({ hole: h, winner, value: accumulated, carried: false, skinsCount });
+      totalPaidOut += accumulated;
+      accumulated = 0;
+    } else if (filled) {
+      holeBreakdown.push({ hole: h, winner: null, value: 0, carried: true, skinsCount: 0 });
+    } else {
+      holeBreakdown.push({ hole: h, winner: null, value: 0, carried: false, skinsCount: 0 });
+    }
+  }
+
+  return {
+    playerResults: state.players.map((p, i) => ({
+      name: p.name || 'Player ' + (i+1),
+      won: playerWon[i],
+      skinsCount: playerSkinsCount[i],
+      holesWon: playerHoles[i],
+    })),
+    totalPaidOut,
+    unclaimed: pot - totalPaidOut,
+    holeBreakdown,
+  };
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+render();
+</script>
+</body>
+</html>
