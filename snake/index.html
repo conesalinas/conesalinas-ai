@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Snake | conesalinas.ai</title>
+<meta name="description" content="The Nokia classic Snake game, rebuilt with AI.">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; user-select: none; -webkit-user-select: none; }
+.phone { background: #2d2d44; border-radius: 24px; padding: 20px 16px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); border: 2px solid #3d3d55; max-width: 400px; width: 100%; }
+.brand { text-align: center; margin-bottom: 8px; color: #6a6a8a; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; }
+.screen { background: #9bbc0f; border-radius: 8px; padding: 10px; border: 3px solid #5a5a7a; box-shadow: inset 0 2px 8px rgba(0,0,0,0.3); }
+.score-bar { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: #306230; font-weight: bold; }
+.grid { display: grid; gap: 0; background: #8bac0f; border: 2px solid #306230; border-radius: 2px; aspect-ratio: 1; width: 100%; }
+.cell { aspect-ratio: 1; }
+.cell.head { background: #0f380f; border-radius: 3px; }
+.cell.body { background: #306230; border-radius: 1px; }
+.cell.food { background: #0f380f; border-radius: 50%; margin: 1px; }
+.status { text-align: center; margin-top: 6px; color: #306230; font-size: 12px; font-weight: bold; min-height: 18px; }
+.start-wrap { display: flex; justify-content: center; margin-top: 16px; }
+.start-btn { background: #4ecca3; color: #1a1a2e; border: none; border-radius: 24px; padding: 12px 36px; font-size: 16px; font-weight: bold; font-family: 'Courier New', monospace; cursor: pointer; letter-spacing: 2px; box-shadow: 0 4px 12px rgba(78,204,163,0.3); }
+.dpad { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 16px; }
+.dpad-row { display: flex; gap: 6px; }
+.dpad-btn { width: 56px; height: 56px; background: #3d3d55; color: #9bbc0f; border: 2px solid #4a4a6a; border-radius: 14px; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.dpad-btn:active { background: #4a4a6a; }
+.dpad-center { width: 56px; height: 56px; background: #252540; border-radius: 14px; border: 2px solid #3d3d55; }
+.footer { text-align: center; margin-top: 12px; color: #4a4a6a; font-size: 10px; letter-spacing: 2px; }
+.hint { color: #4a4a6a; font-size: 12px; margin-top: 16px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="brand">CONESALINAS.AI</div>
+  <div class="screen">
+    <div class="score-bar">
+      <span id="score">SCORE: 0</span>
+      <span id="highScore">HI: 0</span>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="status" id="status">PRESS START TO PLAY</div>
+  </div>
+
+  <div class="start-wrap" id="startWrap">
+    <button class="start-btn" id="startBtn">START</button>
+  </div>
+
+  <div class="dpad">
+    <button class="dpad-btn" id="btnUp">▲</button>
+    <div class="dpad-row">
+      <button class="dpad-btn" id="btnLeft">◀</button>
+      <div class="dpad-center"></div>
+      <button class="dpad-btn" id="btnRight">▶</button>
+    </div>
+    <button class="dpad-btn" id="btnDown">▼</button>
+  </div>
+
+  <div class="footer">BUILT WITH AI IN ONE PROMPT</div>
+</div>
+
+<p class="hint">Arrow keys / WASD on desktop · D-pad on mobile</p>
+
+<script>
+const SIZE = 20;
+const INITIAL_SPEED = 150;
+const SPEED_INC = 5;
+const MIN_SPEED = 60;
+
+const DIR = { UP: {x:0,y:-1}, DOWN: {x:0,y:1}, LEFT: {x:-1,y:0}, RIGHT: {x:1,y:0} };
+
+let snake, food, dir, lastDir, state, score, highScore, speed, interval;
+const grid = document.getElementById("grid");
+const scoreEl = document.getElementById("score");
+const highScoreEl = document.getElementById("highScore");
+const statusEl = document.getElementById("status");
+const startBtn = document.getElementById("startBtn");
+const startWrap = document.getElementById("startWrap");
+
+grid.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+const cells = [];
+for (let i = 0; i < SIZE * SIZE; i++) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  grid.appendChild(cell);
+  cells.push(cell);
+}
+
+highScore = 0;
+state = "idle";
+
+function getRandomFood() {
+  let pos;
+  do {
+    pos = { x: Math.floor(Math.random() * SIZE), y: Math.floor(Math.random() * SIZE) };
+  } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  return pos;
+}
+
+function resetGame() {
+  snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+  food = getRandomFood();
+  dir = DIR.RIGHT;
+  lastDir = DIR.RIGHT;
+  score = 0;
+  speed = INITIAL_SPEED;
+  state = "playing";
+  startBtn.textContent = "START";
+  render();
+  clearInterval(interval);
+  interval = setInterval(tick, speed);
+}
+
+function changeDir(newDir) {
+  if (newDir.x + lastDir.x !== 0 || newDir.y + lastDir.y !== 0) {
+    dir = newDir;
+  }
+}
+
+function tick() {
+  lastDir = dir;
+  const head = {
+    x: (snake[0].x + dir.x + SIZE) % SIZE,
+    y: (snake[0].y + dir.y + SIZE) % SIZE,
+  };
+
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    state = "gameover";
+    highScore = Math.max(highScore, score);
+    clearInterval(interval);
+    startBtn.textContent = "PLAY AGAIN";
+    render();
+    return;
+  }
+
+  snake.unshift(head);
+
+  if (head.x === food.x && head.y === food.y) {
+    score += 10;
+    food = getRandomFood();
+    speed = Math.max(MIN_SPEED, speed - SPEED_INC);
+    clearInterval(interval);
+    interval = setInterval(tick, speed);
+  } else {
+    snake.pop();
+  }
+
+  render();
+}
+
+function render() {
+  cells.forEach(c => c.className = "cell");
+  
+  snake.forEach((s, i) => {
+    const idx = s.y * SIZE + s.x;
+    if (idx >= 0 && idx < cells.length) {
+      cells[idx].className = i === 0 ? "cell head" : "cell body";
+    }
+  });
+
+  const fi = food.y * SIZE + food.x;
+  if (fi >= 0 && fi < cells.length) cells[fi].className = "cell food";
+
+  scoreEl.textContent = "SCORE: " + score;
+  highScoreEl.textContent = "HI: " + Math.max(highScore, score || 0);
+
+  if (state === "idle") statusEl.textContent = "PRESS START TO PLAY";
+  else if (state === "gameover") statusEl.textContent = "GAME OVER \u2014 " + score + " PTS";
+  else statusEl.textContent = "LENGTH: " + snake.length;
+}
+
+// Start/restart
+startBtn.addEventListener("click", resetGame);
+
+// Keyboard
+document.addEventListener("keydown", e => {
+  if (state === "idle" || state === "gameover") {
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); resetGame(); return; }
+  }
+  if (state !== "playing") return;
+  const map = {
+    ArrowUp: DIR.UP, ArrowDown: DIR.DOWN, ArrowLeft: DIR.LEFT, ArrowRight: DIR.RIGHT,
+    w: DIR.UP, s: DIR.DOWN, a: DIR.LEFT, d: DIR.RIGHT,
+    W: DIR.UP, S: DIR.DOWN, A: DIR.LEFT, D: DIR.RIGHT,
+  };
+  if (map[e.key]) { e.preventDefault(); changeDir(map[e.key]); }
+});
+
+// D-pad buttons
+document.getElementById("btnUp").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "playing") changeDir(DIR.UP); });
+document.getElementById("btnDown").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "playing") changeDir(DIR.DOWN); });
+document.getElementById("btnLeft").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "playing") changeDir(DIR.LEFT); });
+document.getElementById("btnRight").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "playing") changeDir(DIR.RIGHT); });
+
+// Swipe controls
+let touchStart = null;
+document.addEventListener("touchstart", e => {
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+document.addEventListener("touchend", e => {
+  if (!touchStart) return;
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    changeDir(dx > 0 ? DIR.RIGHT : DIR.LEFT);
+  } else {
+    changeDir(dy > 0 ? DIR.DOWN : DIR.UP);
+  }
+  touchStart = null;
+});
+
+render();
+</script>
+</body>
+</html>
