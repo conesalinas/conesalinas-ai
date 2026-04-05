@@ -54,7 +54,7 @@ section { padding: 80px 24px; max-width: 620px; margin: 0 auto; }
 
 /* App cards */
 .app-card { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 10px; border: 1px solid var(--border); transition: all 0.25s; margin-bottom: 12px; }
-.app-card:hover { border-color: var(--border-hover); background: #0d0e10; }
+.app-card:hover { border-color: var(--border-hover); background: #0d0e10; cursor: pointer; }
 .app-card .emoji { font-size: 28px; line-height: 1; }
 .app-card .name { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: 0.5px; }
 .app-card .desc { font-size: 14px; color: var(--dim); margin-top: 2px; }
@@ -133,31 +133,31 @@ footer { padding: 24px; text-align: center; border-top: 1px solid #111; font-siz
   <p class="section-label mono">Apps</p>
   <p class="section-sub">Built in one weekend with AI. Try them out.</p>
 
-  <div class="app-card">
+  <a href="/snake" class="app-card" style="text-decoration:none;color:inherit">
     <span class="emoji">🐍</span>
     <div style="flex:1"><div class="name mono">Snake</div><div class="desc">The Nokia classic, rebuilt with AI</div></div>
     <span class="badge live mono">LIVE</span>
-  </div>
-  <div class="app-card">
+  </a>
+  <a href="/pomodoro" class="app-card" style="text-decoration:none;color:inherit">
     <span class="emoji">🔥</span>
     <div style="flex:1"><div class="name mono">Focus Timer</div><div class="desc">A pomodoro that roasts you when you quit</div></div>
-    <span class="badge soon mono">SOON</span>
-  </div>
-  <div class="app-card">
+    <span class="badge live mono">LIVE</span>
+  </a>
+  <a href="/golf" class="app-card" style="text-decoration:none;color:inherit">
     <span class="emoji">⛳</span>
     <div style="flex:1"><div class="name mono">Golf Skins</div><div class="desc">Settle the bets after every round</div></div>
-    <span class="badge soon mono">SOON</span>
-  </div>
-  <div class="app-card">
+    <span class="badge live mono">LIVE</span>
+  </a>
+  <a href="/protein" class="app-card" style="text-decoration:none;color:inherit">
     <span class="emoji">🥩</span>
     <div style="flex:1"><div class="name mono">Protein Tracker</div><div class="desc">Hit your daily protein goal</div></div>
-    <span class="badge soon mono">SOON</span>
-  </div>
-  <div class="app-card">
+    <span class="badge live mono">LIVE</span>
+  </a>
+  <a href="/workout" class="app-card" style="text-decoration:none;color:inherit">
     <span class="emoji">🏋️</span>
     <div style="flex:1"><div class="name mono">Workout Tracker</div><div class="desc">Log lifts, track progress</div></div>
     <span class="badge live mono">LIVE</span>
-  </div>
+  </a>
 </section>
 
 <div class="divider"></div>
