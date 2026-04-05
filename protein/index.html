@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protein Tracker | conesalinas.ai</title>
+<meta name="description" content="Track your daily protein intake. Built with AI.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#07080a;color:#ddd9d0;font-family:'Courier New',monospace;min-height:100vh;padding:20px 16px}
+.container{max-width:420px;margin:0 auto}
+.header{font-size:13px;letter-spacing:4px;color:#5da9d6;text-transform:uppercase;text-align:center;margin-bottom:28px}
+.card{background:#111216;border:1px solid #1a1a1a;border-radius:10px;padding:16px;margin-bottom:12px}
+.label{font-size:10px;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:8px}
+input[type="text"],input[type="number"]{background:#07080a;border:1px solid #222;border-radius:8px;color:#ddd9d0;font-size:14px;font-family:'Courier New',monospace;padding:10px 12px;outline:none;width:100%;box-sizing:border-box}
+input:focus{border-color:#5da9d6}
+input[type="number"]{-moz-appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.btn{border:none;border-radius:8px;padding:10px 20px;font-size:12px;font-weight:700;font-family:'Courier New',monospace;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.25s}
+.btn-primary{background:#5da9d6;color:#07080a}
+.btn-primary:hover{background:#7bbde3}
+.btn-green{background:#22c55e;color:#07080a}
+.btn-green:hover{background:#16a34a}
+.btn-outline{background:transparent;color:#666;border:1px solid #222}
+.btn-outline:hover{border-color:#5da9d6;color:#5da9d6}
+
+/* Progress ring */
+.ring-wrap{display:flex;justify-content:center;margin-bottom:24px;position:relative}
+.ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.ring-grams{font-size:36px;font-weight:700;line-height:1}
+.ring-target{font-size:11px;color:#555;margin-top:4px}
+.ring-status{font-size:10px;margin-top:6px;letter-spacing:1px;text-transform:uppercase}
+
+/* Quick add */
+.quick-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.quick-btn{background:#07080a;border:1px solid #1a1a1a;border-radius:8px;padding:8px 10px;cursor:pointer;transition:all 0.2s;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;min-width:70px;flex:1 1 auto}
+.quick-btn:hover{border-color:#22c55e;background:#0d0e10}
+.quick-btn:active{transform:scale(0.95)}
+.quick-name{font-size:10px;color:#999;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
+.quick-grams{font-size:13px;font-weight:700;color:#22c55e}
+
+/* Log entries */
+.log-entry{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid #151517}
+.log-entry:first-child{border-top:none}
+.log-label{font-size:12px;font-weight:600}
+.log-time{font-size:9px;color:#555;margin-left:8px}
+.log-grams{font-size:13px;font-weight:700;color:#22c55e}
+.log-remove{background:transparent;border:none;color:#2a2a2a;font-size:16px;cursor:pointer;padding:2px 6px;margin-left:8px;transition:color 0.2s}
+.log-remove:hover{color:#c0392b}
+
+/* History */
+.history-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px}
+.day-dot{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;border:1px solid #151517}
+.day-label{font-size:8px;color:#444;text-align:center}
+.day-header{font-size:8px;color:#444;text-align:center;padding:2px 0}
+
+footer{text-align:center;font-size:10px;color:#222;letter-spacing:2px;margin-top:32px;padding-top:16px;border-top:1px solid #111}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">CONESALINAS.AI</div>
+<div id="app"></div>
+<footer>BUILT WITH AI · CONESALINAS.AI</footer>
+</div>
+
+<script>
+const TARGET = 165;
+const QUICK_PROTEINS = [
+  {label:"Chicken",grams:43},{label:"Steak",grams:42},{label:"Fairlife",grams:42},
+  {label:"Ground Beef",grams:36},{label:"Salmon",grams:34},{label:"Shake",grams:30},
+  {label:"Cottage Ch.",grams:25},{label:"Tuna",grams:20},{label:"Eggs (3)",grams:18},
+  {label:"Edamame",grams:17},{label:"Greek Yogurt",grams:15},{label:"Deli Turkey",grams:12},
+  {label:"Kefir",grams:11},{label:"String Ch.",grams:7},{label:"Cheese 1oz",grams:7},
+];
+
+let entries = [];
+let manualGrams = '';
+let manualLabel = '';
+
+function loadData() {
+  try {
+    const d = localStorage.getItem('cone-protein');
+    if (d) entries = JSON.parse(d);
+  } catch(e) {}
+}
+
+function saveData() {
+  try { localStorage.setItem('cone-protein', JSON.stringify(entries)); } catch(e) {}
+}
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function timeStr() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function todayEntries() {
+  return entries.filter(e => e.date === today());
+}
+
+function todayTotal() {
+  return todayEntries().reduce((s, e) => s + e.grams, 0);
+}
+
+function getColor(total) {
+  if (total >= TARGET) return '#22c55e';
+  if (total >= TARGET * 0.7) return '#f59e0b';
+  return '#ef4444';
+}
+
+function getStatus(total) {
+  if (total >= TARGET) return 'TARGET HIT!';
+  const left = TARGET - total;
+  return `${left}g to go`;
+}
+
+function addEntry(label, grams) {
+  entries.push({ date: today(), label, grams, time: timeStr(), id: Date.now() });
+  saveData();
+  render();
+}
+
+function removeEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  saveData();
+  render();
+}
+
+function getLast30Days() {
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const total = entries.filter(e => e.date === ds).reduce((s, e) => s + e.grams, 0);
+    const dayName = d.toLocaleDateString('en', {weekday:'short'}).substring(0,2);
+    const dayNum = d.getDate();
+    days.push({ date: ds, total, dayName, dayNum, isToday: ds === today() });
+  }
+  return days;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  const total = todayTotal();
+  const pct = Math.min(100, (total / TARGET) * 100);
+  const color = getColor(total);
+  const status = getStatus(total);
+  const todayLog = todayEntries();
+  const history = getLast30Days();
+
+  // SVG ring
+  const r = 90;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct / 100);
+
+  let html = `
+    <!-- Progress Ring -->
+    <div class="ring-wrap">
+      <svg width="220" height="220" viewBox="0 0 220 220" style="transform:rotate(-90deg)">
+        <circle cx="110" cy="110" r="${r}" fill="none" stroke="#151517" stroke-width="8"/>
+        <circle cx="110" cy="110" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+          stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+          style="transition:stroke-dashoffset 0.5s ease,stroke 0.3s"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-grams" style="color:${color}">${total}g</div>
+        <div class="ring-target">/ ${TARGET}g</div>
+        <div class="ring-status" style="color:${color}">${status}</div>
+      </div>
+    </div>
+
+    <!-- Quick Add -->
+    <div class="card">
+      <div class="label">Quick Add</div>
+      <div class="quick-grid">
+        ${QUICK_PROTEINS.map((item, i) => `
+          <div class="quick-btn" id="qadd-${i}">
+            <span class="quick-name">${item.label}</span>
+            <span class="quick-grams">+${item.grams}g</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Manual Add -->
+    <div class="card">
+      <div class="label">Manual Add</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="manualLabel" placeholder="Food (optional)" value="${esc(manualLabel)}" style="flex:2">
+        <input type="number" id="manualGrams" placeholder="g" value="${manualGrams}" style="flex:1;width:60px!important">
+        <button class="btn btn-green" id="manualAddBtn">ADD</button>
+      </div>
+      <div style="font-size:9px;color:#333;margin-top:6px">Just enter grams to log without a label</div>
+    </div>
+
+    <!-- Today's Log -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="label" style="margin-bottom:0">Today's Log</div>
+        ${todayLog.length > 0 ? `<span style="font-size:11px;font-weight:700;color:${color}">${total}g total</span>` : ''}
+      </div>
+      ${todayLog.length === 0 ? `<div style="text-align:center;padding:20px 0;color:#333;font-size:12px">Nothing logged yet today.</div>` : ''}
+      ${todayLog.map(e => `
+        <div class="log-entry">
+          <div>
+            <span class="log-label">${esc(e.label)}</span>
+            <span class="log-time">${e.time}</span>
+          </div>
+          <div style="display:flex;align-items:center">
+            <span class="log-grams">+${e.grams}g</span>
+            <button class="log-remove" id="rem-${e.id}">&times;</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="label">Last 30 Days</div>
+      <div class="history-grid">
+        ${history.map(d => {
+          let bg, borderColor, textColor;
+          if (d.total === 0 && !d.isToday) {
+            bg = '#0a0a0a'; borderColor = '#151517'; textColor = '#333';
+          } else if (d.total >= TARGET) {
+            bg = 'rgba(34,197,94,0.15)'; borderColor = 'rgba(34,197,94,0.3)'; textColor = '#22c55e';
+          } else if (d.total >= TARGET * 0.7) {
+            bg = 'rgba(245,158,11,0.15)'; borderColor = 'rgba(245,158,11,0.3)'; textColor = '#f59e0b';
+          } else if (d.total > 0) {
+            bg = 'rgba(239,68,68,0.1)'; borderColor = 'rgba(239,68,68,0.2)'; textColor = '#ef4444';
+          } else {
+            bg = '#0d0e10'; borderColor = d.isToday ? '#5da9d6' : '#151517'; textColor = d.isToday ? '#5da9d6' : '#333';
+          }
+          return `<div class="day-dot" style="background:${bg};border-color:${borderColor};color:${textColor}" title="${d.date}: ${d.total}g">${d.dayNum}</div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:center;gap:16px;font-size:9px;color:#444;margin-top:8px">
+        <span><span style="color:#22c55e">\u25CF</span> Hit</span>
+        <span><span style="color:#f59e0b">\u25CF</span> Close</span>
+        <span><span style="color:#ef4444">\u25CF</span> Missed</span>
+        <span><span style="color:#333">\u25CF</span> None</span>
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div style="text-align:center;margin-top:8px">
+      <button class="btn btn-outline" id="resetTodayBtn" style="font-size:10px;padding:8px 16px">Reset Today</button>
+    </div>
+  `;
+
+  app.innerHTML = html;
+  bindEvents();
+}
+
+function bindEvents() {
+  // Quick add buttons
+  QUICK_PROTEINS.forEach((item, i) => {
+    document.getElementById('qadd-'+i).addEventListener('click', () => {
+      addEntry(item.label, item.grams);
+    });
+  });
+
+  // Manual add
+  const labelInput = document.getElementById('manualLabel');
+  const gramsInput = document.getElementById('manualGrams');
+  const addBtn = document.getElementById('manualAddBtn');
+
+  labelInput.addEventListener('input', e => { manualLabel = e.target.value; });
+  gramsInput.addEventListener('input', e => { manualGrams = e.target.value; });
+
+  function doManualAdd() {
+    const g = parseInt(manualGrams);
+    if (!g || g <= 0) return;
+    const label = manualLabel.trim() || g + 'g protein';
+    manualLabel = '';
+    manualGrams = '';
+    addEntry(label, g);
+  }
+
+  addBtn.addEventListener('click', doManualAdd);
+  gramsInput.addEventListener('keydown', e => { if (e.key === 'Enter') doManualAdd(); });
+  labelInput.addEventListener('keydown', e => { if (e.key === 'Enter') gramsInput.focus(); });
+
+  // Remove entries
+  todayEntries().forEach(e => {
+    const btn = document.getElementById('rem-'+e.id);
+    if (btn) btn.addEventListener('click', () => removeEntry(e.id));
+  });
+
+  // Reset today
+  document.getElementById('resetTodayBtn').addEventListener('click', () => {
+    const t = today();
+    entries = entries.filter(e => e.date !== t);
+    saveData();
+    render();
+  });
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+loadData();
+render();
+</script>
+</body>
+</html>
